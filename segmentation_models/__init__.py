@@ -123,8 +123,10 @@ get_available_backbone_names = Backbones.models_names
 
 def get_preprocessing(name):
     preprocess_input = Backbones.get_preprocessing(name)
-    # add bakcend, models, layers, utils submodules in kwargs
-    preprocess_input = inject_global_submodules(preprocess_input)
+    # add backend, models, layers, utils submodules in kwargs
+    # mobilenetv3 backbone throws if backend keyword is used so remove keywords for that backbone
+    if 'mobilenetv3' not in name:
+        preprocess_input = inject_global_submodules(preprocess_input)
     # delete other kwargs
     # keras-applications preprocessing raise an error if something
     # except `backend`, `layers`, `models`, `utils` passed in kwargs
