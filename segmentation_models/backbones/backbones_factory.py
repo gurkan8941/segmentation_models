@@ -54,7 +54,7 @@ class BackbonesFactory(ModelsFactory):
         'mobilenetv2': ('block_13_expand_relu', 'block_6_expand_relu', 'block_3_expand_relu',
                         'block_1_expand_relu'),
         'mobilenetv3': ('activation_29', 'activation_15', 'activation_6', 'activation_2'),
-        'mobilenetv3small': ('activation_22', 'activation_7', 'activation_3', 'activation'),
+        'mobilenetv3small': ('activation_22', 'activation_7', 'activation_3', 'activation_0'),
         #'mobilenetv3large': ('Conv_1', 'activation_29', 'activation_15', 'activation_6'),
         #'mobilenetv3small': ('activation_31', 'activation_22', 'activation_7', 'activation_3'),
 

@@ -158,7 +158,7 @@ def _depth(v, divisor=8, min_value=None):
     return new_v
 
 
-def _se_block(inputs, filters, se_ratio, prefix):
+def _se_block(inputs, filters, se_ratio, prefix, activation_start_id):
     x = GlobalAveragePooling2D(name=prefix + 'squeeze_excite/AvgPool')(inputs)
     if K.image_data_format() == 'channels_first':
         x = Reshape((filters, 1, 1))(x)
@@ -173,7 +173,7 @@ def _se_block(inputs, filters, se_ratio, prefix):
                       kernel_size=1,
                       padding='same',
                       name=prefix + 'squeeze_excite/Conv_1')(x)
-    x = Activation(hard_sigmoid)(x)
+    x = Activation(hard_sigmoid, name='activation_{}'.format(activation_start_id))(x)
     #if K.backend() == 'theano':
         ## For the Theano backend, we have to explicitly make
         ## the excitation weights broadcastable.
@@ -186,7 +186,7 @@ def _se_block(inputs, filters, se_ratio, prefix):
 
 
 def _inverted_res_block(x, expansion, filters, kernel_size, stride,
-                        se_ratio, activation, block_id):
+                        se_ratio, activation, block_id, activation_start_id):
     channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
     shortcut = x
     prefix = 'expanded_conv/'
@@ -203,7 +203,7 @@ def _inverted_res_block(x, expansion, filters, kernel_size, stride,
                                       epsilon=1e-3,
                                       momentum=0.999,
                                       name=prefix + 'expand/BatchNorm')(x)
-        x = Activation(activation)(x)
+        x = Activation(activation, name='activation_{}'.format(activation_start_id))(x)
 
     if stride == 2:
         x = ZeroPadding2D(padding=correct_pad(K, x, kernel_size),
@@ -217,10 +217,10 @@ def _inverted_res_block(x, expansion, filters, kernel_size, stride,
                                   epsilon=1e-3,
                                   momentum=0.999,
                                   name=prefix + 'depthwise/BatchNorm')(x)
-    x = Activation(activation)(x)
+    x = Activation(activation, name='activation_{}'.format(activation_start_id + 1))(x)
 
     if se_ratio:
-        x = _se_block(x, _depth(infilters * expansion), se_ratio, prefix)
+        x = _se_block(x, _depth(infilters * expansion), se_ratio, prefix, activation_start_id + 2)
 
     x = Conv2D(filters,
                       kernel_size=1,
@@ -437,7 +437,7 @@ def MobileNetV3(stack_fn,
                                   epsilon=1e-3,
                                   momentum=0.999,
                                   name='Conv/BatchNorm')(x)
-    x = Activation(activation)(x)
+    x = Activation(activation, name='activation_0')(x)
 
     x = stack_fn(x, kernel, activation, se_ratio)
 
@@ -457,7 +457,7 @@ def MobileNetV3(stack_fn,
                                   epsilon=1e-3,
                                   momentum=0.999,
                                   name='Conv_1/BatchNorm')(x)
-    x = Activation(activation)(x)
+    x = Activation(activation, name='activation_{}'.format('final'))(x)
 
     if include_top:
         x = GlobalAveragePooling2D()(x)
@@ -469,7 +469,7 @@ def MobileNetV3(stack_fn,
                           kernel_size=1,
                           padding='same',
                           name='Conv_2')(x)
-        x = Activation(activation)(x)
+        x = Activation(activation, name='activation_{}'.format('head'))(x)
         if dropout_rate > 0:
             x = Dropout(dropout_rate)(x)
         x = Conv2D(classes,
@@ -527,17 +527,17 @@ def MobileNetV3Small(input_shape=None,
     def stack_fn(x, kernel, activation, se_ratio):
         def depth(d):
             return _depth(d * alpha)
-        x = _inverted_res_block(x, 1, depth(16), 3, 2, se_ratio, relu, 0)
-        x = _inverted_res_block(x, 72. / 16, depth(24), 3, 2, None, relu, 1)
-        x = _inverted_res_block(x, 88. / 24, depth(24), 3, 1, None, relu, 2)
-        x = _inverted_res_block(x, 4, depth(40), kernel, 2, se_ratio, activation, 3)
-        x = _inverted_res_block(x, 6, depth(40), kernel, 1, se_ratio, activation, 4)
-        x = _inverted_res_block(x, 6, depth(40), kernel, 1, se_ratio, activation, 5)
-        x = _inverted_res_block(x, 3, depth(48), kernel, 1, se_ratio, activation, 6)
-        x = _inverted_res_block(x, 3, depth(48), kernel, 1, se_ratio, activation, 7)
-        x = _inverted_res_block(x, 6, depth(96), kernel, 2, se_ratio, activation, 8)
-        x = _inverted_res_block(x, 6, depth(96), kernel, 1, se_ratio, activation, 9)
-        x = _inverted_res_block(x, 6, depth(96), kernel, 1, se_ratio, activation, 10)
+        x = _inverted_res_block(x, 1, depth(16), 3, 2, se_ratio, relu, 0, 0)
+        x = _inverted_res_block(x, 72. / 16, depth(24), 3, 2, None, relu, 1, 3)
+        x = _inverted_res_block(x, 88. / 24, depth(24), 3, 1, None, relu, 2, 5)
+        x = _inverted_res_block(x, 4, depth(40), kernel, 2, se_ratio, activation, 3, 7)
+        x = _inverted_res_block(x, 6, depth(40), kernel, 1, se_ratio, activation, 4, 10)
+        x = _inverted_res_block(x, 6, depth(40), kernel, 1, se_ratio, activation, 5, 13)
+        x = _inverted_res_block(x, 3, depth(48), kernel, 1, se_ratio, activation, 6, 16)
+        x = _inverted_res_block(x, 3, depth(48), kernel, 1, se_ratio, activation, 7, 19)
+        x = _inverted_res_block(x, 6, depth(96), kernel, 2, se_ratio, activation, 8, 22)
+        x = _inverted_res_block(x, 6, depth(96), kernel, 1, se_ratio, activation, 9, 25)
+        x = _inverted_res_block(x, 6, depth(96), kernel, 1, se_ratio, activation, 10, 28)
         return x
     return MobileNetV3(stack_fn,
                        1024,
@@ -567,24 +567,24 @@ def MobileNetV3Large(input_shape=None,
     def stack_fn(x, kernel, activation, se_ratio):
         def depth(d):
             return _depth(d * alpha)
-        x = _inverted_res_block(x, 1, depth(16), 3, 1, None, relu, 0)
-        x = _inverted_res_block(x, 4, depth(24), 3, 2, None, relu, 1)
-        x = _inverted_res_block(x, 3, depth(24), 3, 1, None, relu, 2)
-        x = _inverted_res_block(x, 3, depth(40), kernel, 2, se_ratio, relu, 3)
-        x = _inverted_res_block(x, 3, depth(40), kernel, 1, se_ratio, relu, 4)
-        x = _inverted_res_block(x, 3, depth(40), kernel, 1, se_ratio, relu, 5)
-        x = _inverted_res_block(x, 6, depth(80), 3, 2, None, activation, 6)
-        x = _inverted_res_block(x, 2.5, depth(80), 3, 1, None, activation, 7)
-        x = _inverted_res_block(x, 2.3, depth(80), 3, 1, None, activation, 8)
-        x = _inverted_res_block(x, 2.3, depth(80), 3, 1, None, activation, 9)
-        x = _inverted_res_block(x, 6, depth(112), 3, 1, se_ratio, activation, 10)
-        x = _inverted_res_block(x, 6, depth(112), 3, 1, se_ratio, activation, 11)
+        x = _inverted_res_block(x, 1, depth(16), 3, 1, None, relu, 0, 0)
+        x = _inverted_res_block(x, 4, depth(24), 3, 2, None, relu, 1, 2)
+        x = _inverted_res_block(x, 3, depth(24), 3, 1, None, relu, 2, 4)
+        x = _inverted_res_block(x, 3, depth(40), kernel, 2, se_ratio, relu, 3, 6)
+        x = _inverted_res_block(x, 3, depth(40), kernel, 1, se_ratio, relu, 4, 9)
+        x = _inverted_res_block(x, 3, depth(40), kernel, 1, se_ratio, relu, 5, 12)
+        x = _inverted_res_block(x, 6, depth(80), 3, 2, None, activation, 6, 15)
+        x = _inverted_res_block(x, 2.5, depth(80), 3, 1, None, activation, 7, 17)
+        x = _inverted_res_block(x, 2.3, depth(80), 3, 1, None, activation, 8, 19)
+        x = _inverted_res_block(x, 2.3, depth(80), 3, 1, None, activation, 9, 21)
+        x = _inverted_res_block(x, 6, depth(112), 3, 1, se_ratio, activation, 10, 23)
+        x = _inverted_res_block(x, 6, depth(112), 3, 1, se_ratio, activation, 11, 26)
         x = _inverted_res_block(x, 6, depth(160), kernel, 2, se_ratio,
-                                activation, 12)
+                                activation, 12, 29)
         x = _inverted_res_block(x, 6, depth(160), kernel, 1, se_ratio,
-                                activation, 13)
+                                activation, 13, 32)
         x = _inverted_res_block(x, 6, depth(160), kernel, 1, se_ratio,
-                                activation, 14)
+                                activation, 14, 35)
         return x
     return MobileNetV3(stack_fn,
                        1280,
