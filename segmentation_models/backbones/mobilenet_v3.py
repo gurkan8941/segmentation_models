@@ -49,7 +49,7 @@ from tensorflow.keras import backend as K
 #layers = None
 #models = None
 #keras_utils = None
-from tensorflow.python.keras.applications import imagenet_utils
+from tensorflow.keras.applications import imagenet_utils
 
 BASE_WEIGHT_PATH = ('https://github.com/DrSlink/mobilenet_v3_keras/'
                     'releases/download/v1.0/')
